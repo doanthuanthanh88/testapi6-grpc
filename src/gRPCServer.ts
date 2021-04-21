@@ -4,6 +4,7 @@ import chalk from 'chalk'
 import { Tag } from 'testapi6/dist/components/Tag'
 import { context } from 'testapi6/dist/Context'
 import { Input } from 'testapi6/dist/components'
+import { Testcase } from 'testapi6/dist/components/Testcase'
 
 /**
  * Create a gRPC server
@@ -44,7 +45,7 @@ export class gRPCServer extends Tag {
       const packageConfig = this.packages[packageName]
       // Suggested options for similarity to existing grpc.load behavior
       const packageDefinition = loadSync(
-        packageConfig.proto,
+        Testcase.getPathFromRoot(packageConfig.proto),
         packageConfig.config || {
           keepCase: true,
           longs: String,

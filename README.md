@@ -5,7 +5,7 @@ Execute grpc command
 - Create a gRPC server to mock data
 - Provide gRPC client to call to another
 
-> Read [document details](./docs/modules.md)
+> Read [document details](./docs/modules.html)
 
 # How to use
 ### Installation

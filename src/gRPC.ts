@@ -4,6 +4,7 @@ import chalk from 'chalk'
 import { Validate } from 'testapi6/dist/components'
 import { Operation } from 'testapi6/dist/components/doc/OpenAPI3'
 import { Tag } from 'testapi6/dist/components/Tag'
+import { Testcase } from 'testapi6/dist/components/Testcase'
 import { context } from 'testapi6/dist/Context'
 
 context
@@ -119,7 +120,7 @@ export class gRPC extends Tag {
     this._client = gRPC.Clients.get(this.key)
     if (!this._client) {
       const packageDefinition = loadSync(
-        this.proto,
+        Testcase.getPathFromRoot(this.proto),
         this.config || {
           keepCase: true,
           longs: String,
