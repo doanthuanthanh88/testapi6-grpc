@@ -139,7 +139,7 @@ export class gRPC extends Tag {
   async prepare() {
     await super.prepare(undefined, ['validate', 'var', 'docs'])
     if (this.validate) {
-      this.validate = this.validate.filter(v => v)
+      this.validate = this.validate.filter(v => v).map(v => new Validate(v))
     }
   }
 
