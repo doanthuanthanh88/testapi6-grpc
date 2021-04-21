@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "removeComments": false,
+    "sourceMap": false
+  },
+  "typedocOptions": {
+    "out": "docs",
+    "excludeNotDocumented": true,
+    "disableSources": true,
+    "hideGenerator": true
+  }
+}

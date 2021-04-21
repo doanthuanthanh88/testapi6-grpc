@@ -1,0 +1,42 @@
+{
+  "name": "testapi6-grpc",
+  "version": "1.1.0",
+  "description": "Provide grpc server and client",
+  "main": "dist/index.js",
+  "scripts": {
+    "doc": "typedoc --tsconfig tsconfig.doc.json --watch src/index.ts",
+    "build:doc": "rm -rf docs && typedoc --tsconfig tsconfig.doc.json src/index.ts",
+    "pub": "npm publish",
+    "dev": "nodemon --watch src --watch modules --ext .ts --exec 'node -r ts-node/register -r ./bin/tsconfig-paths-bootstrap.js --expose-gc --harmony --inspect src/index.ts test'",
+    "build": "yarn clean && tsc && yarn build:resolve-module",
+    "build:resolve-module": "node bin/tsconfig",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.2.12",
+    "@grpc/proto-loader": "^0.6.1",
+    "chalk": "^4.1.0",
+    "lodash": "^4.17.21"
+  },
+  "readme": "./docs/README.md",
+  "homepage": "https://github.com/doanthuanthanh88",
+  "author": {
+    "name": "Đoàn Thuận Thành",
+    "email": "doanthuanthanh88@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/doanthuanthanh88/testapi6-grpc"
+  },
+  "devDependencies": {
+    "@types/chalk": "^2.2.0",
+    "@types/lodash": "^4.14.122",
+    "@types/node": "^14.14.6",
+    "nodemon": "^2.0.2",
+    "testapi6": "^1.1.0",
+    "ts-node": "^8.8.2",
+    "typedoc": "^0.20.32",
+    "typescript": "^3.8.3"
+  }
+}

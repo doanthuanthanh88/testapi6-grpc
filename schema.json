@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "anyOf": [
+    {
+      "$ref": "#/definitions/$MODULE_NAME"
+    }
+  ],
+  "definitions": {
+    "$MODULE_NAME": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "$MODULE_NAME": {
+          "type": "object",
+          "description": "Start a mock API server",
+          "additionalProperties": false,
+          "properties": {
+            "disabled": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "title": {
+              "type": "string",
+              "description": "Description"
+            },
+            "https": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "description": "Use default https key and cert"
+                },
+                {
+                  "type": "object",
+                  "description": "Specific the https key and cert to create https server",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "cert": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "host": {
+              "type": "string",
+              "description": "Host to bind"
+            },
+            "port": {
+              "type": "integer",
+              "description": "Port to bind"
+            },
+            "routers": {
+              "type": "array",
+              "description": "Define APIs information",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "root": {
+                        "type": "string",
+                        "description": "Serve static file which in this location"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "method": {
+                        "type": "string",
+                        "description": "Request method",
+                        "enum": [
+                          "GET",
+                          "POST",
+                          "PUT",
+                          "DELETE",
+                          "PATCH",
+                          "HEAD"
+                        ]
+                      },
+                      "path": {
+                        "type": "string",
+                        "description": "Request url"
+                      },
+                      "status": {
+                        "type": "number",
+                        "description": "Response status"
+                      },
+                      "headers": {
+                        "type": "object",
+                        "description": "Response status text"
+                      },
+                      "data": {
+                        "type": [
+                          "object",
+                          "string",
+                          "number",
+                          "null",
+                          "array",
+                          "boolean"
+                        ],
+                        "description": "Response data"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
