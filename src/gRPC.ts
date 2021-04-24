@@ -1,8 +1,8 @@
-import { Client, loadPackageDefinition, credentials } from '@grpc/grpc-js'
+import { loadPackageDefinition, credentials, Metadata } from '@grpc/grpc-js'
+import { ServiceClient } from '@grpc/grpc-js/build/src/make-client'
 import { loadSync } from '@grpc/proto-loader'
 import chalk from 'chalk'
 import { Validate } from 'testapi6/dist/components'
-import { Operation } from 'testapi6/dist/components/doc/OpenAPI3'
 import { Tag } from 'testapi6/dist/components/Tag'
 import { Testcase } from 'testapi6/dist/components/Testcase'
 import { context } from 'testapi6/dist/Context'
@@ -18,11 +18,11 @@ context
   })
   .on('log:grpc:done', (api: gRPC) => {
     if (!api.slient && !api.depends) {
-      context.log(`\t${chalk[api.response?.ok ? 'green' : 'red']('↳ ' + (api.response?.ok ? 'OK' : 'FAILED'))} ${chalk.gray.italic('%s')}`, ` (${api.time.toString()}ms)`)
+      context.log(`\t${chalk[api.output?.ok ? 'green' : 'red']('↳ ' + (api.output?.ok ? 'OK' : 'FAILED'))} ${chalk.gray.italic('%s')}`, ` (${api.time.toString()}ms)`)
     }
   })
   .on('log:grpc:end', (api: gRPC) => {
-    if (['details', 'response', 'request'].includes(api.debug as string)) {
+    if (['details', 'output', 'input'].includes(api.debug as string)) {
       context.group('')
       api.logDetails()
       context.groupEnd()
@@ -38,7 +38,7 @@ context
  */
 export class gRPC extends Tag {
   static APIs = new Array<gRPC>()
-  static Clients = new Map<string, Client>()
+  static Clients = new Map<string, ServiceClient>()
 
   static Index = 0
   index = 0
@@ -51,19 +51,19 @@ export class gRPC extends Tag {
   /** Description */
   description: string
   /** How to log for debugging */
-  debug: boolean | 'curl' | 'details' | 'request' | 'response'
-  /** Set timeout for the request */
+  debug: 'details' | 'input' | 'output'
+  /** Set timeout for the call */
   timeout: number
   /** 
-   * Set data after request done
+   * Set data after call done
    * 
    * ```yaml
-   * string: set response data to this var
-   * object: set customize response to each properties in this var
+   * string: set output data to this var
+   * object: set customize output to each properties in this var
    * ```
    */
   var: string | { [key: string]: any }
-  /** Save response to file */
+  /** Save output to file */
   saveTo?: string
   /** Execution time */
   time: number
@@ -73,37 +73,31 @@ export class gRPC extends Tag {
   '<-': string | string[]
   /** Only validate for the before step */
   depends: boolean
-  /** Validate after request done */
+  /** Validate after call done */
   validate: Validate[]
   /** Generate to document */
   docs?: {
-    /** Only doc these request headers */
-    headers?: string[]
-    /** Only doc these response headers */
-    responseHeaders?: string[]
-    /** Config for markdown document */
     md?: {
       /** Group API document */
       tags?: string[]
     }
-    /** Config for swagger document */
-    swagger?: Operation
   }
 
   proto: string
   package: string
   service: string
   function: string
-  arg: any
+  input: any
   metadata?: any
   config: any
 
-  _client: Client
+  _client: ServiceClient
 
-  /** Response object */
-  response: {
+  /** Wrapper result data */
+  output: {
+    /** Call status */
     ok: boolean
-    /** Response data */
+    /** Result which is returned after call done */
     data: any
   }
   error: any
@@ -173,33 +167,42 @@ export class gRPC extends Tag {
     const begin = Date.now()
     try {
       context.emit('log:grpc:begin', this)
-      this.response = {
+      this.output = {
         ok: false,
         data: undefined
       }
-      this.response.data = await new Promise((resolve, reject) => {
+      this.output.data = await new Promise((resolve, reject) => {
         const opts = {} as any
         if (this.timeout) {
           opts.deadline = new Date(Date.now() + this.timeout)
         }
-        this._client[this.function](this.arg, opts, (err, data) => {
+        if (this.metadata) {
+          opts.credentials = credentials.createFromMetadataGenerator((_params, callback) => {
+            const meta = new Metadata();
+            for (let k in this.metadata) {
+              meta.add(k, this.metadata[k]);
+            }
+            callback(null, meta);
+          })
+        }
+        this._client[this.function](this.input, opts, (err, data) => {
           if (err) {
             return reject(err)
           }
           resolve(data)
         })
       })
-      this.response.ok = true
+      this.output.ok = true
       if (this.docs) {
         this.docs = this.replaceVars(this.docs, { ...context.Vars, Vars: context.Vars, $: this, $$: this.$$, Utils: context.Utils, Result: context.Result })
       }
     } catch (err) {
       this.error = err
-      this.response.ok = false
+      this.output.ok = false
     } finally {
       this.time = Date.now() - begin
       context.emit('log:grpc:done', this)
-      if (this.var) this.setVar(this.var, this.response.data)
+      if (this.var) this.setVar(this.var, this.output.data)
       if (!this.error) {
         if (this.validate) {
           await this.validates()
@@ -212,19 +215,36 @@ export class gRPC extends Tag {
   }
 
   logDetails() {
-    const space = '--------------------------------------'
-    if (['details', 'request'].includes(this.debug as string)) {
+    if (['details', 'input'].includes(this.debug as string)) {
       context.log(`${chalk.red('%s')}`, `(${this.package}) ${this.service}.${this.function}(?)`)
       context.log('')
+      // Input metadata
+      const metadata = Object.keys(this.metadata)
+      if (metadata.length) {
+        context.group(chalk.gray('Metadata'), chalk.gray('---------------------'))
+        context.log('')
+        metadata.forEach(k => context.log(chalk.italic(`• ${k}: ${this.metadata[k]}`)))
+        context.groupEnd()
+        context.log('')
+      }
+      // Input data
+      if (this.input) {
+        context.group(chalk.gray('Input'), chalk.gray('---------------------'))
+        context.log('')
+        context.log(this.input)
+        context.groupEnd()
+        context.log('')
+      }
     }
-    if (['details', 'response'].includes(this.debug as string) && this.response) {
-      const res = this.response
-      context.log(chalk.green('%s'), `RESPONSE`)
-      // Response data
+    if (['details', 'output'].includes(this.debug as string) && this.output) {
+      const res = this.output
+      context.group(chalk.gray('Output'), chalk.gray('---------------------'))
+      // Output data
       if (res.data) {
-        context.log(chalk.gray('%s'), space)
+        context.log('')
         context.log(res.data)
       }
+      context.groupEnd()
       context.log('')
     }
   }

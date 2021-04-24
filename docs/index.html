@@ -70,7 +70,7 @@
 					<li>Provide gRPC client to call to another</li>
 				</ul>
 				<blockquote>
-					<p>Read <a href="./docs/modules.md">document details</a></p>
+					<p>Read <a href="./docs/modules.html">document details</a></p>
 				</blockquote>
 				<a href="#how-to-use" id="how-to-use" style="color: inherit; text-decoration: none;">
 					<h1>How to use</h1>
@@ -87,35 +87,58 @@
 				<a href="#use-in-yaml" id="use-in-yaml" style="color: inherit; text-decoration: none;">
 					<h3>Use in yaml</h3>
 				</a>
-				<pre><code class="language-yaml"><span style="color: #000000">- </span><span style="color: #800000">Require</span><span style="color: #000000">:</span>
-<span style="color: #000000">    </span><span style="color: #800000">root</span><span style="color: #000000">: </span><span style="color: #0000FF">path_to_this_modules</span>
-<span style="color: #000000">    </span><span style="color: #800000">modules</span><span style="color: #000000">:</span>
-<span style="color: #000000">      - </span><span style="color: #0000FF">testapi6-grpc/dist/index.js</span>
-<span style="color: #000000">- </span><span style="color: #800000">gRPCServer</span><span style="color: #000000">:</span>
-<span style="color: #000000">    </span><span style="color: #800000">packages</span><span style="color: #000000">:</span>
-<span style="color: #000000">      </span><span style="color: #800000">user</span><span style="color: #000000">:</span>
-<span style="color: #000000">        </span><span style="color: #800000">proto</span><span style="color: #000000">: </span><span style="color: #0000FF">/Users/doanthuanthanh/code/github/testapi6-grpc/src/server.proto</span>
-<span style="color: #000000">        </span><span style="color: #800000">services</span><span style="color: #000000">:</span>
-<span style="color: #000000">          </span><span style="color: #800000">RouteUser</span><span style="color: #000000">:</span>
-<span style="color: #000000">            </span><span style="color: #800000">GetUsers</span><span style="color: #000000">: {</span>
-<span style="color: #000000">              </span><span style="color: #800000">code</span><span style="color: #000000">: </span><span style="color: #098658">1</span><span style="color: #000000">,</span>
-<span style="color: #000000">              </span><span style="color: #800000">data</span><span style="color: #000000">: [{</span><span style="color: #800000">name</span><span style="color: #000000">: </span><span style="color: #0000FF">&#039;thanh&#039;</span><span style="color: #000000">, </span><span style="color: #800000">age</span><span style="color: #000000">: </span><span style="color: #098658">1</span><span style="color: #000000">}]</span>
-<span style="color: #000000">            }</span>
-<span style="color: #000000">- </span><span style="color: #800000">gRPC</span><span style="color: #000000">:</span>
-<span style="color: #000000">    </span><span style="color: #800000">title</span><span style="color: #000000">: </span><span style="color: #0000FF">Test call to a gRPC server</span>
-<span style="color: #000000">    </span><span style="color: #800000">proto</span><span style="color: #000000">: </span><span style="color: #0000FF">/Users/doanthuanthanh/code/github/testapi6-grpc/src/server.proto</span>
-<span style="color: #000000">    </span><span style="color: #800000">package</span><span style="color: #000000">: </span><span style="color: #0000FF">user</span>
-<span style="color: #000000">    </span><span style="color: #800000">service</span><span style="color: #000000">: </span><span style="color: #0000FF">RouteUser</span>
-<span style="color: #000000">    </span><span style="color: #800000">function</span><span style="color: #000000">: </span><span style="color: #0000FF">GetUsers</span>
-<span style="color: #000000">    </span><span style="color: #800000">arg</span><span style="color: #000000">: </span><span style="color: #0000FF">null</span>
-<span style="color: #000000">    </span><span style="color: #800000">timeout</span><span style="color: #000000">: </span><span style="color: #098658">1000</span>
-<span style="color: #000000">    </span><span style="color: #800000">debug</span><span style="color: #000000">: </span><span style="color: #0000FF">details</span>
-<span style="color: #000000">    </span><span style="color: #800000">validate</span><span style="color: #000000">:</span>
-<span style="color: #000000">      - </span><span style="color: #800000">title</span><span style="color: #000000">: </span><span style="color: #0000FF">Check something</span>
-<span style="color: #000000">        </span><span style="color: #800000">func</span><span style="color: #000000">: </span><span style="color: #0000FF">length</span>
-<span style="color: #000000">        </span><span style="color: #800000">args</span><span style="color: #000000">:</span>
-<span style="color: #000000">          - </span><span style="color: #0000FF">${$.response.data}</span>
-<span style="color: #000000">          - </span><span style="color: #098658">1</span>
+				<ul>
+					<li><p>File <code>/testapi6-grpc/src/server.proto</code>
+							```proto
+						syntax = &quot;proto3&quot;;</p>
+						<p>package user;</p>
+						<p>import &quot;google/protobuf/empty.proto&quot;;</p>
+						<p>service RouteUser {
+							rpc GetUsers(google.protobuf.Empty) returns (ResponseUser);
+						}</p>
+						<p>message ResponseUser {
+							optional int32 code = 1;
+							repeated User data = 2;
+						}</p>
+						<p>message User {
+							string name = 1;
+							int32 age = 2;
+						}</p>
+					</li>
+				</ul>
+				<pre><code><span style="color: #A31515">```yaml</span>
+<span style="color: #A31515">- Require:</span>
+<span style="color: #A31515">    root: path_to_this_modules</span>
+<span style="color: #A31515">    modules:</span>
+<span style="color: #A31515">      - testapi6-grpc/dist/index.js</span>
+<span style="color: #A31515">- gRPCServer:</span>
+<span style="color: #A31515">    packages:</span>
+<span style="color: #A31515">      user:</span>
+<span style="color: #A31515">        proto: /testapi6-grpc/src/server.proto</span>
+<span style="color: #A31515">        services:</span>
+<span style="color: #A31515">          RouteUser:</span>
+<span style="color: #A31515">            GetUsers: {</span>
+<span style="color: #A31515">              code: 1,</span>
+<span style="color: #A31515">              data: [{name: &#039;thanh&#039;, age: 1}]</span>
+<span style="color: #A31515">            }</span>
+<span style="color: #A31515">- gRPC:</span>
+<span style="color: #A31515">    title: Test call to a gRPC server</span>
+<span style="color: #A31515">    proto: /testapi6-grpc/src/server.proto</span>
+<span style="color: #A31515">    package: user</span>
+<span style="color: #A31515">    service: RouteUser</span>
+<span style="color: #A31515">    function: GetUsers</span>
+<span style="color: #A31515">    input: null</span>
+<span style="color: #A31515">    timeout: 1000</span>
+<span style="color: #A31515">    debug: details</span>
+<span style="color: #A31515">    validate:</span>
+<span style="color: #A31515">      - title: Check something</span>
+<span style="color: #A31515">        func: length</span>
+<span style="color: #A31515">        args:</span>
+<span style="color: #A31515">          - </span><span style="color: #0000FF">${</span><span style="color: #001080">$</span><span style="color: #000000FF">.</span><span style="color: #001080">response</span><span style="color: #000000FF">.</span><span style="color: #001080">data</span><span style="color: #0000FF">}</span>
+<span style="color: #A31515">          - 1</span>
+<span style="color: #A31515">- gRPCDoc:</span>
+<span style="color: #A31515">    title: Document the gRPC calls</span>
+<span style="color: #A31515">    saveTo: doc.md</span>
 </code></pre>
 			</div>
 		</div>
@@ -131,6 +154,9 @@
 				<ul class="before-current">
 					<li class=" tsd-kind-class">
 						<a href="classes/grpc.html" class="tsd-kind-icon">gRPC</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/grpcdoc.html" class="tsd-kind-icon">gRPCDoc</a>
 					</li>
 					<li class=" tsd-kind-class">
 						<a href="classes/grpcserver.html" class="tsd-kind-icon">gRPCServer</a>

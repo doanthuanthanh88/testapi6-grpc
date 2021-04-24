@@ -1,7 +1,7 @@
 import { Server, ServerCredentials, loadPackageDefinition } from '@grpc/grpc-js'
 import { loadSync } from '@grpc/proto-loader'
 import chalk from 'chalk'
-import { Tag } from 'testapi6/dist/components/Tag'
+import { replaceVars, Tag } from 'testapi6/dist/components/Tag'
 import { context } from 'testapi6/dist/Context'
 import { Input } from 'testapi6/dist/components'
 import { Testcase } from 'testapi6/dist/components/Testcase'
@@ -21,7 +21,7 @@ export class gRPCServer extends Tag {
       config?: any
       services: {
         [serviceName: string]: {
-          /** FunctionName: ResponseData */
+          /** FunctionName: Output */
           [functionName: string]: any
         }
       }
@@ -37,9 +37,13 @@ export class gRPCServer extends Tag {
     if (!this.port) this.port = 50051
   }
 
+  prepare(scope?: any) {
+    return super.prepare(scope, ['packages'])
+  }
+
   async beforeExec() {
     await super.beforeExec()
-
+    const self = this
     this._server = new Server()
     for (const packageName in this.packages) {
       const packageConfig = this.packages[packageName]
@@ -56,16 +60,26 @@ export class gRPCServer extends Tag {
       )
       const protoDescriptor = loadPackageDefinition(packageDefinition);
       const pack = protoDescriptor[packageName];
+      context.group(chalk.green('gRPC endpoints:'))
+
       for (const serviceName in packageConfig.services) {
         const service = packageConfig.services[serviceName]
         this._server.addService(pack[serviceName].service, Object.keys(service).reduce((sum: any, funcName: string) => {
-          context.log(chalk.green(`- (${packageName}) ${serviceName}.${funcName}(?)`))
-          sum[funcName] = (ctx) => {
-            ctx.call.sendUnaryMessage(null, service[funcName])
+          context.log(chalk.green(`- /${packageName}/${serviceName}.${funcName}(?)`))
+          sum[funcName] = async (ctx) => {
+            let data = service[funcName]
+            if (typeof data === 'function') {
+              data = await data(ctx)
+            }
+            // @ts-ignore
+            const metadata = ctx.metadata
+            const rs = replaceVars(data, { metadata, $: self })
+            ctx.call.sendUnaryMessage(null, rs)
           }
           return sum
         }, {}))
       }
+      context.groupEnd()
     }
   }
 

@@ -62,7 +62,7 @@ yarn global add testapi6-grpc
     package: user
     service: RouteUser
     function: GetUsers
-    arg: null
+    input: null
     timeout: 1000
     debug: details
     validate:
@@ -71,4 +71,7 @@ yarn global add testapi6-grpc
         args:
           - ${$.response.data}
           - 1
+- gRPCDoc:
+    title: Document the gRPC calls
+    saveTo: doc.md
 ```
