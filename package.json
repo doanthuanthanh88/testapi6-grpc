@@ -1,6 +1,6 @@
 {
   "name": "testapi6-grpc",
-  "version": "1.1.3",
+  "version": "1.1.6",
   "description": "Provide grpc server and client",
   "main": "dist/index.js",
   "scripts": {
@@ -13,10 +13,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.2.12",
-    "@grpc/proto-loader": "^0.6.1",
+    "@grpc/grpc-js": "^1.3.2",
+    "@grpc/proto-loader": "^0.6.2",
     "chalk": "^4.1.0",
-    "lodash": "^4.17.21"
+    "js-yaml": "^4.1.0",
+    "lodash": "^4.17.21",
+    "mkdirp": "^1.0.4"
   },
   "readme": "./docs/README.md",
   "homepage": "https://github.com/doanthuanthanh88",
@@ -31,10 +33,11 @@
   },
   "devDependencies": {
     "@types/chalk": "^2.2.0",
+    "@types/js-yaml": "^4.0.2",
     "@types/lodash": "^4.14.122",
     "@types/node": "^14.14.6",
     "nodemon": "^2.0.2",
-    "testapi6": "^1.1.0",
+    "testapi6": "^1.2.47",
     "ts-node": "^8.8.2",
     "typedoc": "^0.20.32",
     "typescript": "^3.8.3"

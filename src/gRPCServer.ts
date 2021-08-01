@@ -3,8 +3,9 @@ import { loadSync } from '@grpc/proto-loader'
 import chalk from 'chalk'
 import { replaceVars, Tag } from 'testapi6/dist/components/Tag'
 import { context } from 'testapi6/dist/Context'
-import { Input } from 'testapi6/dist/components'
+import { Input } from 'testapi6/dist/components/input/Input'
 import { Testcase } from 'testapi6/dist/components/Testcase'
+import { merge } from 'lodash'
 
 /**
  * Create a gRPC server
@@ -30,8 +31,8 @@ export class gRPCServer extends Tag {
 
   _server: Server
 
-  constructor(attrs: Partial<gRPCServer>) {
-    super(attrs)
+  init(attrs: Partial<gRPCServer>) {
+    super.init(attrs)
     if (!this.packages) this.packages = {}
     if (!this.host) this.host = '0.0.0.0'
     if (!this.port) this.port = 50051
@@ -48,15 +49,19 @@ export class gRPCServer extends Tag {
     for (const packageName in this.packages) {
       const packageConfig = this.packages[packageName]
       // Suggested options for similarity to existing grpc.load behavior
+      packageConfig.proto = Testcase.getPathFromRoot(packageConfig.proto)
+      if (packageConfig.config?.includeDirs) {
+        packageConfig.config.includeDirs = packageConfig.config.includeDirs.map(e => Testcase.getPathFromRoot(e))
+      }
       const packageDefinition = loadSync(
-        Testcase.getPathFromRoot(packageConfig.proto),
-        packageConfig.config || {
+        packageConfig.proto,
+        merge({
           keepCase: true,
           longs: String,
           enums: String,
           defaults: true,
           oneofs: true
-        }
+        }, packageConfig.config || {})
       )
       const protoDescriptor = loadPackageDefinition(packageDefinition);
       const pack = protoDescriptor[packageName];
@@ -98,7 +103,8 @@ export class gRPCServer extends Tag {
           resolve(undefined)
         })
 
-        const inp = new Input({
+        const inp = new Input()
+        inp.init({
           title: `Enter to stop the gRPC service "${this.title || ''}" !`
         })
         inp.setup(this.tc)

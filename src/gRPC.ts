@@ -2,7 +2,8 @@ import { loadPackageDefinition, credentials, Metadata } from '@grpc/grpc-js'
 import { ServiceClient } from '@grpc/grpc-js/build/src/make-client'
 import { loadSync } from '@grpc/proto-loader'
 import chalk from 'chalk'
-import { Validate } from 'testapi6/dist/components'
+import { merge } from 'lodash'
+import { Validate } from 'testapi6/dist/components/data_handler/Validate'
 import { Tag } from 'testapi6/dist/components/Tag'
 import { Testcase } from 'testapi6/dist/components/Testcase'
 import { context } from 'testapi6/dist/Context'
@@ -10,26 +11,30 @@ import { context } from 'testapi6/dist/Context'
 context
   .on('log:grpc:begin', (api: gRPC) => {
     if (!api.slient && !api.depends) {
-      context.log(`${chalk.gray('%s')}.\t${chalk.green('%s')}\t${chalk.gray.underline('%s')}`, api.index.toString(), api.title, `(${api.package}) ${api.service}.${api.function}(?)`)
+      context.log(`${chalk.green('%s')} ${chalk.green('%s')}\t${chalk.yellow('%s')}${chalk.gray.underline('%s')}`, api.icon, api.title, api.docs ? '★ ' : '', `/${api.package}/${api.service}.${api.function}`)
     }
   })
   .on('log:grpc:validate:done', (_api: gRPC) => {
     // Validate done
   })
   .on('log:grpc:done', (api: gRPC) => {
-    if (!api.slient && !api.depends) {
-      context.log(`\t${chalk[api.output?.ok ? 'green' : 'red']('↳ ' + (api.output?.ok ? 'OK' : 'FAILED'))} ${chalk.gray.italic('%s')}`, ` (${api.time.toString()}ms)`)
+    if (!api.slient) {
+      if (!api.depends) {
+        context.log(`  ${chalk.gray(api.iconResponse)} ${chalk[api.output?.ok ? 'green' : 'red']('%s')} ${chalk.gray('%s')}`, 'OK', ` (${api.time.toString()}ms)`)
+      } else if (api.title) {
+        context.log('  %s %s \t %s', chalk.green('☑'), chalk.magenta(api.title), chalk.gray.underline(`/${api.package}/${api.service}.${api.function}`))
+      }
     }
-  })
-  .on('log:grpc:end', (api: gRPC) => {
-    if (['details', 'output', 'input'].includes(api.debug as string)) {
+    if (['details', 'response', 'request'].includes(api.debug as string)) {
       context.group('')
       api.logDetails()
       context.groupEnd()
     }
+  })
+  .on('log:grpc:end', (api: gRPC) => {
     if (api.error) {
-      context.log(chalk.red(api.error.message))
       api.tc.result.failed++
+      context.log(chalk.red(api.error.message))
     }
   })
 
@@ -41,9 +46,26 @@ export class gRPC extends Tag {
   static Clients = new Map<string, ServiceClient>()
 
   static Index = 0
+  static ignores = [
+    ...Tag.ignores,
+    'iconResponse',
+    'index',
+    'var',
+    'time',
+    '->',
+    '<-',
+    'depends',
+    'output',
+    'validate',
+    'docs',
+  ]
+  icon = '→'
+  iconResponse = '↳'
   index = 0
 
   key?: any
+  /** Server URL */
+  url: string
   /** Server port */
   port?: number
   /** Server address */
@@ -51,7 +73,7 @@ export class gRPC extends Tag {
   /** Description */
   description: string
   /** How to log for debugging */
-  debug: 'details' | 'input' | 'output'
+  debug: boolean | 'details' | 'request' | 'response'
   /** Set timeout for the call */
   timeout: number
   /** 
@@ -77,6 +99,13 @@ export class gRPC extends Tag {
   validate: Validate[]
   /** Generate to document */
   docs?: {
+    /** Only doc these metadata */
+    allowMetadata?: string[]
+    deprecated?: boolean
+    tags?: string[]
+    metadata?: any
+    input?: any
+    output?: any
     md?: {
       /** Group API document */
       tags?: string[]
@@ -102,11 +131,18 @@ export class gRPC extends Tag {
   }
   error: any
 
-  constructor(attrs: Partial<gRPC>) {
-    super(attrs)
-    if (!this.host) this.host = '0.0.0.0'
-    if (!this.port) this.port = 50051
-    if (!this.key) this.key = this.host + ':' + this.port
+  init(attrs: Partial<gRPC>) {
+    super.init(attrs)
+    if (this.url) {
+      const [host, port] = this.url.split(':')
+      this.host = host
+      this.port = +port || 50051
+    } else {
+      if (!this.host) this.host = '0.0.0.0'
+      if (!this.port) this.port = 50051
+      this.url = `${this.host}:${this.port}`
+    }
+    if (!this.key) this.key = this.url
   }
 
   async beforeExec() {
@@ -114,14 +150,14 @@ export class gRPC extends Tag {
     this._client = gRPC.Clients.get(this.key)
     if (!this._client) {
       const packageDefinition = loadSync(
-        Testcase.getPathFromRoot(this.proto),
-        this.config || {
+        this.proto,
+        merge({
           keepCase: true,
           longs: String,
           enums: String,
           defaults: true,
           oneofs: true
-        }
+        }, this.config || {})
       )
       const protoDescriptor = loadPackageDefinition(packageDefinition);
       const pack = protoDescriptor[this.package];
@@ -131,9 +167,33 @@ export class gRPC extends Tag {
   }
 
   async prepare() {
-    await super.prepare(undefined, ['validate', 'var', 'docs'])
+    await super.prepare(undefined, gRPC.ignores)
+    this.proto = Testcase.getPathFromRoot(this.proto)
+    if (this.config?.includeDirs) {
+      this.config.includeDirs = this.config.includeDirs.map(e => Testcase.getPathFromRoot(e))
+    }
     if (this.validate) {
-      this.validate = this.validate.filter(v => v).map(v => new Validate(v))
+      this.validate = this.validate.filter(v => v).map(v => {
+        const vl = new Validate()
+        vl.init(v)
+        return vl
+      })
+    }
+  }
+
+  toTestAPI6() {
+    return {
+      url: this.url,
+      title: this.title,
+      proto: this.proto,
+      package: this.package,
+      service: this.service,
+      config: this.config,
+      metadata: this.metadata,
+      function: this.function,
+      input: this.input,
+      timeout: this.timeout,
+      debug: 'details'
     }
   }
 
@@ -219,7 +279,7 @@ export class gRPC extends Tag {
       context.log(`${chalk.red('%s')}`, `(${this.package}) ${this.service}.${this.function}(?)`)
       context.log('')
       // Input metadata
-      const metadata = Object.keys(this.metadata)
+      const metadata = Object.keys(this.metadata || {})
       if (metadata.length) {
         context.group(chalk.gray('Metadata'), chalk.gray('---------------------'))
         context.log('')
@@ -249,8 +309,8 @@ export class gRPC extends Tag {
     }
   }
 
-  dispose() {
-    this._client?.close()
-    this._client = null
-  }
+  // dispose() {
+  //   this._client?.close()
+  //   this._client = null
+  // }
 }

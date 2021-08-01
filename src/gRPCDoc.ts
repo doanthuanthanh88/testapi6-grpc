@@ -1,7 +1,12 @@
-import { OutputFile } from 'testapi6/dist/components/output/OutputFile'
-import { merge, uniqBy } from 'lodash'
-import { isGotData } from 'testapi6/dist/components/doc/DocUtils'
-import { gRPC } from "./gRPC"
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { dump } from 'js-yaml';
+import { merge, pick, uniqBy } from 'lodash';
+import mkdirp from 'mkdirp';
+import { basename, dirname, join, relative } from 'path';
+import { isGotData, schemaToMD, toJsonSchema } from 'testapi6/dist/components/doc/DocUtils';
+import { OutputFile } from 'testapi6/dist/components/output/OutputFile';
+import { Testcase } from 'testapi6/dist/components/Testcase';
+import { gRPC } from "./gRPC";
 
 /**
  * Export markdown document
@@ -11,6 +16,8 @@ import { gRPC } from "./gRPC"
  * ```
  */
 export class gRPCDoc extends OutputFile {
+  /** Only doc these metadata */
+  allowMetadata?: string[]
   /** Overide swagger properties which system generated */
   raw?: {
     /** Document title */
@@ -25,34 +32,45 @@ export class gRPCDoc extends OutputFile {
     servers: { [env: string]: string }
   }
 
-  constructor(attrs) {
-    super(attrs)
-  }
-
   async exec() {
     let menu = []
-    this.raw = merge({}, this.tc, this.raw)
+    const { title, description, version = '', developer = '', servers } = this.tc
+    this.raw = merge({ title, description, version, developer, servers }, this.raw)
     menu.push(`# ${this.raw.title || this.tc.title || ''}`)
-    menu.push(`_${this.raw.description || this.tc.description || ''}_`)
-    menu.push('')
-    menu.push('')
-    menu.push(`> Version \`${this.raw.version || this.tc.version || ''}\``)
-    const developer = this.raw?.developer || this.tc.developer || ''
-    if (developer) {
-      menu.push(`> [Contact ${developer.split('@')[0]}](mailto:${developer})`)
+    const des = this.raw.description || this.tc.description
+    if (des) {
+      menu.push('')
+      menu.push(`_${des}_  `)
     }
-    menu.push(`> Last updated: \`${new Date().toString()}\``)
     menu.push('')
-    menu.push('## APIs')
-    const details = ['## Details']
-    const apis = uniqBy(gRPC.APIs.filter(api => api.docs && api.title), e => `/${e.package}/${e.service}.${e.function}`)
+    menu.push('<br/>')
+    menu.push('')
+    menu.push(`Version: \`${this.raw.version || this.tc.version || ''}\`  `)
+    if (developer) {
+      menu.push(`Developer: [${developer.split('@')[0]}](mailto:${developer})  `)
+    }
+    menu.push(`Last updated: \`${new Date().toString()}\``)
+    menu.push('')
+    menu.push('<br/>')
+    menu.push('')
+    if (servers) {
+      menu.push('')
+      menu.push('## Servers')
+      menu = menu.concat(Object.keys(servers).map(des => `- ${des}: ${servers[des]}`))
+      menu.push('')
+      menu.push('<br/>')
+      menu.push('')
+    }
+
+    const details = ['', '<br/><br/>', '']
+    const apis = uniqBy(gRPC.APIs.filter(api => api.docs && api.title), tag => `\`/${tag.package}/${tag.service}.${tag.function}(?)\``)
     const tags = [] as { name: string, items: gRPC[] }[]
     apis.forEach(a => {
-      a.docs = merge({ md: { tags: [] } }, a.docs)
-      if (!a.docs.md.tags.length) {
+      a.docs = merge({ md: { tags: [] }, tags: [] }, a.docs)
+      if (!a.docs.md?.tags?.length && !a.docs.tags?.length) {
         a.docs.md.tags.push('default')
       }
-      a.docs?.md?.tags?.forEach(t => {
+      [...(a.docs?.md?.tags || []), ...(a.docs?.tags || [])].forEach(t => {
         let tag = tags.find(tag => tag.name === t)
         if (!tag) {
           tag = { name: t, items: [] }
@@ -67,70 +85,140 @@ export class gRPCDoc extends OutputFile {
     }
 
     const menus = []
-    menus.push(`|No.  | API Description | API Function |`)
-    menus.push(`|---: | ---- | ---- |`)
+    menus.push(`|     |   Title  | Function | |`)
+    menus.push(`|---: | ---- | ---- | ---- |`)
+
+    const saveFolder = dirname(this.saveTo)
+    const yamlFolder = join(saveFolder, 'yaml')
+    mkdirp.sync(yamlFolder)
 
     for (let tag of tags) {
       const idx = menus.length
       let len = 0
+
       tag.items.forEach((tag, i) => {
+        const yamlFile = join(yamlFolder, Testcase.toFileName(tag.title) + '.grpc.yaml')
+        writeFileSync(yamlFile, dump([
+          {
+            Vars: Object.keys(tag.tc.servers || {}).reduce((sum, e) => {
+              sum[e] = tag.tc.servers[e]
+              return sum
+            }, {})
+          },
+          {
+            gRPC: tag.toTestAPI6()
+          }
+        ]))
+
         len++
-        menus.push(`|${i + 1}.| [**${tag.title}**](#${tag.index}) | \`/${tag.package}/${tag.service}.${tag.function}(?)\` |`)
+        const tagTitle = tag.docs.deprecated ? `~~${tag.title}~~` : `${tag.title}`
+        menus.push(`|${i + 1}.| [${tagTitle}](#${tag.index}) | ${`\`/${tag.package}/${tag.service}.${tag.function}(?)\``} | [YAML](${relative(saveFolder, yamlFile)}) |`)
       })
-      menus.splice(idx, 0, `|  | __${tag.name}__ - _${len} items_ |  |`)
+      menus.splice(idx, 0, `| <a name='ANCHOR_-1'></a> | __${tag.name}__ - _${len} items_ |`)
     }
     menu.push('')
 
+
     apis.forEach((tag) => {
-      details.push(`### **${tag.title}**`)
-      
-      tag.description && details.push(`_${tag.description}_`)
-
-      details.push('')
-      details.push(`\`/${tag.package}/${tag.service}.${tag.function}(?)\``)
-      details.push('')
-
-      // Input metadata
-      if (tag.metadata) {
-        details.push('#### Metadata')
-        if (isGotData(tag.metadata, true)) {
-          details.push(...Object.keys(tag.metadata).map(k => `- \`${k}\`: *${tag.metadata[k]}*`))
-        }
+      const tagTitle = tag.docs.deprecated ? `~~${tag.title}~~` : `${tag.title}`
+      details.push(`## <a name='${tag.index}'></a>${tagTitle}`)
+      if (tag.description) {
+        details.push(`_${tag.description}_`, '')
       }
 
-      // Input body
+      details.push((tag.docs.tags || []).map(t => `\`(${t})\``).join(' '))
+
+      details.push('')
+      details.push('<br/>')
+      details.push('')
+
+      details.push(`Package &nbsp;&nbsp;&nbsp; __\`${tag.package}\`__  `)
+      details.push(`Service &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; __\`${tag.service}\`__  `)
+      details.push(`Function &nbsp;&nbsp;&nbsp; __\`${tag.function}\`__  `)
+
+      const pt = /^import ["']([^'"]+)/mg
+      const cnt = readFileSync(tag.proto).toString()
+      let m = pt.exec(cnt)
+      let protoFiles = []
+      while (m) {
+        protoFiles.push(m[1].trim())
+        m = pt.exec(cnt)
+      }
+      const dirs = tag.config?.includeDirs || [dirname(tag.proto)]
+      protoFiles = [
+        tag.proto,
+        ...dirs.map(dir => {
+          return protoFiles.map(f => join(dir, f)).find(f => existsSync(f))
+        }).filter(e => e)
+      ]
+      protoFiles.forEach(protoFile => {
+        const protoName = basename(protoFile)
+        details.push(`<details><summary><code>${protoName}</code></summary>`, '')
+        details.push('```proto', readFileSync(protoFile).toString(), '```', '')
+        details.push('</details>', '')
+      })
+
+      details.push('<br/>', `<details><summary>testapi6.yaml</summary>`, '')
+      details.push('```yaml', dump({ gRPC: tag.toTestAPI6() }), '```', '')
+      details.push('</details>', '')
+
+      details.push('<br/>', '<br/>', '', '### Request', '')
+
+      // Request
+      const _metadata = tag.metadata || {}
+      const metadata = this.allowMetadata?.length ? pick(_metadata, this.allowMetadata) : _metadata
+      if (isGotData(metadata, true)) {
+        details.push(`<details><summary>Metadata</summary>`, '')
+        details.push('```json', JSON.stringify(metadata, null, '  '), '```', '')
+        details.push(`</details>`, '')
+
+        details.push('```yaml')
+        details.push(schemaToMD(merge({}, toJsonSchema(metadata), tag.docs.metadata)))
+        details.push('```', '')
+      }
+
+      // Input
       if (tag.input) {
-        details.push('#### Input')
         if (isGotData(tag.input, false)) {
-          details.push(`\`\`\`json`)
-          details.push(JSON.stringify(tag.input, null, '  '))
-          details.push(`\`\`\``)
+          details.push(`<details><summary>Input</summary>`, '')
+          if (typeof tag.input === 'object') {
+            details.push('```json', JSON.stringify(tag.input, null, '  '), '```', '')
+          } else {
+            details.push('```text', tag.input, '```')
+          }
+          details.push(`</details>`, '')
+
+          details.push('```yaml')
+          details.push(schemaToMD(merge({}, toJsonSchema(tag.input), tag.docs.input)))
+          details.push('```', '')
         }
       }
 
       if (tag.output) {
-        details.push('#### Output')
-        // Output data
+        details.push('', '<br/>', '', '### Response', '')
+
+        // Output
         if (isGotData(tag.output?.data, false)) {
+          details.push(`<details><summary>Output</summary>`, '')
           if (typeof tag.output.data === 'object') {
-            details.push(`\`\`\`json`)
-            details.push(JSON.stringify(tag.output.data, null, '  '))
-            details.push(`\`\`\``)
+            details.push('```json', JSON.stringify(tag.output.data, null, '  '), '```', '')
           } else {
-            details.push(`\`\`\`text`)
-            details.push(tag.output.data)
-            details.push(`\`\`\``)
+            details.push('```text', tag.output.data, '```', '')
+          }
+          details.push(`</details>  `, '')
+
+          if (typeof tag.output.data === 'object') {
+            details.push('```yaml')
+            details.push(schemaToMD(merge({}, toJsonSchema(tag.output.data), tag.docs.output)))
+            details.push('```', '')
           }
         }
       }
+      details.push('')
+      details.push('<br/><br/>')
+      details.push('')
     })
     menu = menu.concat(menus)
-
-    const servers = this.raw?.servers || this.tc.servers
-    if (servers) {
-      menu.push('## Servers')
-      menu = menu.concat(Object.keys(servers).map(des => `- **${servers[des]}** - _${des}_`))
-    }
 
     this.content = menu.concat(details).join('\n')
 
