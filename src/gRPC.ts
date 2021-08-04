@@ -227,31 +227,35 @@ export class gRPC extends Tag {
     const begin = Date.now()
     try {
       context.emit('log:grpc:begin', this)
-      this.output = {
-        ok: false,
-        data: undefined
+      if (!this.output) {
+        this.output = {
+          ok: false,
+          data: undefined
+        }
       }
-      this.output.data = await new Promise((resolve, reject) => {
-        const opts = {} as any
-        if (this.timeout) {
-          opts.deadline = new Date(Date.now() + this.timeout)
-        }
-        if (this.metadata) {
-          opts.credentials = credentials.createFromMetadataGenerator((_params, callback) => {
-            const meta = new Metadata();
-            for (let k in this.metadata) {
-              meta.add(k, this.metadata[k]);
-            }
-            callback(null, meta);
-          })
-        }
-        this._client[this.function](this.input, opts, (err, data) => {
-          if (err) {
-            return reject(err)
+      if (!this.output.data) {
+        this.output.data = await new Promise((resolve, reject) => {
+          const opts = {} as any
+          if (this.timeout) {
+            opts.deadline = new Date(Date.now() + this.timeout)
           }
-          resolve(data)
+          if (this.metadata) {
+            opts.credentials = credentials.createFromMetadataGenerator((_params, callback) => {
+              const meta = new Metadata();
+              for (let k in this.metadata) {
+                meta.add(k, this.metadata[k]);
+              }
+              callback(null, meta);
+            })
+          }
+          this._client[this.function](this.input, opts, (err, data) => {
+            if (err) {
+              return reject(err)
+            }
+            resolve(data)
+          })
         })
-      })
+      }
       this.output.ok = true
       if (this.docs) {
         this.docs = this.replaceVars(this.docs, { ...context.Vars, Vars: context.Vars, $: this, $$: this.$$, Utils: context.Utils, Result: context.Result })
