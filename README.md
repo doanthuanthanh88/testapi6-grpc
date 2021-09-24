@@ -4,6 +4,7 @@ Execute grpc command
 # Features
 - Create a gRPC server to mock data
 - Provide gRPC client to call to another
+- Export to gRPC document
 
 > Read [document details](./docs/modules.html)
 
@@ -42,11 +43,7 @@ yarn global add testapi6-grpc
 
 ```
 ```yaml
-- Require:
-    root: path_to_this_modules
-    modules:
-      - testapi6-grpc/dist/index.js
-- gRPCServer:
+- testapi6-grpc.gRPCServer:
     packages:
       user:
         proto: /testapi6-grpc/src/server.proto
@@ -56,7 +53,7 @@ yarn global add testapi6-grpc
               code: 1,
               data: [{name: 'thanh', age: 1}]
             }
-- gRPC:
+- testapi6-grpc.gRPC:
     title: Test call to a gRPC server
     proto: /testapi6-grpc/src/server.proto
     package: user
@@ -71,7 +68,7 @@ yarn global add testapi6-grpc
         args:
           - ${$.response.data}
           - 1
-- gRPCDoc:
+- testapi6-grpc.gRPCDoc:
     title: Document the gRPC calls
     saveTo: doc.md
 ```

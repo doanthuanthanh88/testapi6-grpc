@@ -16,6 +16,15 @@ import { gRPC } from "./gRPC";
  * ```
  */
 export class gRPCDoc extends OutputFile {
+  static get des() {
+    return `Export to gRPC document`
+  }
+  static get example() {
+    return `- testapi6-grpc.gRPCDoc:
+    title: Document the gRPC calls
+    saveTo: doc.md
+`
+  }
   /** Only doc these metadata */
   allowMetadata?: string[]
   /** Overide swagger properties which system generated */

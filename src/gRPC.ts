@@ -42,6 +42,27 @@ context
  * Create a gRPC client
  */
 export class gRPC extends Tag {
+  static get des() {
+    return `gRPC client to call to another`
+  }
+  static get example() {
+    return `- testapi6-grpc.gRPC:
+    title: Test call to a gRPC server
+    proto: /testapi6-grpc/src/server.proto
+    package: user
+    service: RouteUser
+    function: GetUsers
+    input: null
+    timeout: 1000
+    debug: details
+    validate:
+      - title: Check something
+        func: length
+        args:
+          - \${$.response.data}
+          - 1
+`
+  }
   static APIs = new Array<gRPC>()
   static Clients = new Map<string, ServiceClient>()
 

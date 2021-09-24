@@ -11,6 +11,22 @@ import { merge } from 'lodash'
  * Create a gRPC server
  */
 export class gRPCServer extends Tag {
+  static get des() {
+    return `Create a gRPC server to mock data`
+  }
+  static get example() {
+    return `- testapi6-grpc.gRPCServer:
+    packages:
+      user:
+        proto: /testapi6-grpc/src/server.proto
+        services:
+          RouteUser:
+            GetUsers: {
+              code: 1,
+              data: [{name: 'thanh', age: 1}]
+            }
+`
+  }
   /** Server port */
   port?: number
   /** Server address */
