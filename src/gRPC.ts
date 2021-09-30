@@ -11,7 +11,7 @@ import { context } from 'testapi6/dist/Context'
 context
   .on('log:grpc:begin', (api: gRPC) => {
     if (!api.slient && !api.depends) {
-      context.log(`${chalk.green('%s')} ${chalk.green('%s')}\t${chalk.yellow('%s')}${chalk.gray.underline('%s')}`, api.icon, api.title, api.docs ? '★ ' : '', `/${api.package}/${api.service}.${api.function}`)
+      context.log(`${chalk.green('%s')} ${chalk.green('%s')}\t${chalk.yellow('%s')}${chalk.gray.underline('%s')}`, api.icon, api.title, api.docs ? '★ ' : '', `/${api.package}/${api.service}.${api.method}`)
     }
   })
   .on('log:grpc:validate:done', (_api: gRPC) => {
@@ -20,9 +20,9 @@ context
   .on('log:grpc:done', (api: gRPC) => {
     if (!api.slient) {
       if (!api.depends) {
-        context.log(`  ${chalk.gray(api.iconResponse)} ${chalk[api.output?.ok ? 'green' : 'red']('%s')} ${chalk.gray('%s')}`, 'OK', ` (${api.time.toString()}ms)`)
+        context.log(`  ${chalk.gray(api.iconResponse)} ${chalk[api.response?.ok ? 'green' : 'red']('%s')} ${chalk.gray('%s')}`, 'OK', ` (${api.time.toString()}ms)`)
       } else if (api.title) {
-        context.log('  %s %s \t %s', chalk.green('☑'), chalk.magenta(api.title), chalk.gray.underline(`/${api.package}/${api.service}.${api.function}`))
+        context.log('  %s %s \t %s', chalk.green('☑'), chalk.magenta(api.title), chalk.gray.underline(`/${api.package}/${api.service}.${api.method}`))
       }
     }
     if (['details', 'response', 'request'].includes(api.debug as string)) {
@@ -51,8 +51,9 @@ export class gRPC extends Tag {
     proto: /testapi6-grpc/src/server.proto
     package: user
     service: RouteUser
-    function: GetUsers
-    input: null
+    method: GetUsers
+    request: 
+      txt: thanh
     timeout: 1000
     debug: details
     validate:
@@ -125,8 +126,8 @@ export class gRPC extends Tag {
     deprecated?: boolean
     tags?: string[]
     metadata?: any
-    input?: any
-    output?: any
+    request?: any
+    response?: any
     md?: {
       /** Group API document */
       tags?: string[]
@@ -136,15 +137,15 @@ export class gRPC extends Tag {
   proto: string
   package: string
   service: string
-  function: string
-  input: any
+  method: string
+  request: any
   metadata?: any
   config: any
 
   _client: ServiceClient
 
   /** Wrapper result data */
-  output: {
+  response: {
     /** Call status */
     ok: boolean
     /** Result which is returned after call done */
@@ -211,8 +212,8 @@ export class gRPC extends Tag {
       service: this.service,
       config: this.config,
       metadata: this.metadata,
-      function: this.function,
-      input: this.input,
+      method: this.method,
+      request: this.request,
       timeout: this.timeout,
       debug: 'details'
     }
@@ -248,14 +249,14 @@ export class gRPC extends Tag {
     const begin = Date.now()
     try {
       context.emit('log:grpc:begin', this)
-      if (!this.output) {
-        this.output = {
+      if (!this.response) {
+        this.response = {
           ok: false,
           data: undefined
         }
       }
-      if (!this.output.data) {
-        this.output.data = await new Promise((resolve, reject) => {
+      if (!this.response.data) {
+        this.response.data = await new Promise((resolve, reject) => {
           const opts = {} as any
           if (this.timeout) {
             opts.deadline = new Date(Date.now() + this.timeout)
@@ -269,7 +270,7 @@ export class gRPC extends Tag {
               callback(null, meta);
             })
           }
-          this._client[this.function](this.input, opts, (err, data) => {
+          this._client[this.method](this.request, opts, (err, data) => {
             if (err) {
               return reject(err)
             }
@@ -277,17 +278,17 @@ export class gRPC extends Tag {
           })
         })
       }
-      this.output.ok = true
+      this.response.ok = true
       if (this.docs) {
         this.docs = this.replaceVars(this.docs, { ...context.Vars, Vars: context.Vars, $: this, $$: this.$$, Utils: context.Utils, Result: context.Result })
       }
     } catch (err) {
       this.error = err
-      this.output.ok = false
+      this.response.ok = false
     } finally {
       this.time = Date.now() - begin
       context.emit('log:grpc:done', this)
-      if (this.var) this.setVar(this.var, this.output.data)
+      if (this.var) this.setVar(this.var, this.response.data)
       if (!this.error) {
         if (this.validate) {
           await this.validates()
@@ -300,10 +301,10 @@ export class gRPC extends Tag {
   }
 
   logDetails() {
-    if (['details', 'input'].includes(this.debug as string)) {
-      context.log(`${chalk.red('%s')}`, `(${this.package}) ${this.service}.${this.function}(?)`)
+    if (['details', 'request'].includes(this.debug as string)) {
+      context.log(`${chalk.red('%s')}`, `(${this.package}) ${this.service}.${this.method}(?)`)
       context.log('')
-      // Input metadata
+      // Request metadata
       const metadata = Object.keys(this.metadata || {})
       if (metadata.length) {
         context.group(chalk.gray('Metadata'), chalk.gray('---------------------'))
@@ -312,18 +313,18 @@ export class gRPC extends Tag {
         context.groupEnd()
         context.log('')
       }
-      // Input data
-      if (this.input) {
-        context.group(chalk.gray('Input'), chalk.gray('---------------------'))
+      // Request data
+      if (this.request) {
+        context.group(chalk.gray('Request'), chalk.gray('---------------------'))
         context.log('')
-        context.log(this.input)
+        context.log(this.request)
         context.groupEnd()
         context.log('')
       }
     }
-    if (['details', 'output'].includes(this.debug as string) && this.output) {
-      const res = this.output
-      context.group(chalk.gray('Output'), chalk.gray('---------------------'))
+    if (['details', 'response'].includes(this.debug as string) && this.response) {
+      const res = this.response
+      context.group(chalk.gray('Response'), chalk.gray('---------------------'))
       // Output data
       if (res.data) {
         context.log('')

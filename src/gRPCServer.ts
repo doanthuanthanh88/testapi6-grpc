@@ -1,11 +1,10 @@
-import { Server, ServerCredentials, loadPackageDefinition } from '@grpc/grpc-js'
+import { loadPackageDefinition, Server, ServerCredentials } from '@grpc/grpc-js'
 import { loadSync } from '@grpc/proto-loader'
 import chalk from 'chalk'
-import { replaceVars, Tag } from 'testapi6/dist/components/Tag'
-import { context } from 'testapi6/dist/Context'
-import { Input } from 'testapi6/dist/components/input/Input'
-import { Testcase } from 'testapi6/dist/components/Testcase'
 import { merge } from 'lodash'
+import { Input } from 'testapi6/dist/components/input/Input'
+import { replaceVars, Tag } from 'testapi6/dist/components/Tag'
+import { Testcase } from 'testapi6/dist/components/Testcase'
 
 /**
  * Create a gRPC server
@@ -20,11 +19,21 @@ export class gRPCServer extends Tag {
       user:
         proto: /testapi6-grpc/src/server.proto
         services:
-          RouteUser:
-            GetUsers: {
+          ServiceName1:
+            RPCMethodName: {
+              des: Response data here
               code: 1,
               data: [{name: 'thanh', age: 1}]
             }
+          ServiceName2:
+            RPCMethodNameFunction: |
+              (call) => {
+                return {
+                  des: Response data here
+                  code: 1,
+                  data: [{name: 'thanh', age: 1}]
+                }
+              }
 `
   }
   /** Server port */
@@ -81,40 +90,41 @@ export class gRPCServer extends Tag {
       )
       const protoDescriptor = loadPackageDefinition(packageDefinition);
       const pack = protoDescriptor[packageName];
-      context.group(chalk.green('gRPC endpoints:'))
+      this.context.group(chalk.green('gRPC endpoints:'))
 
       for (const serviceName in packageConfig.services) {
         const service = packageConfig.services[serviceName]
         this._server.addService(pack[serviceName].service, Object.keys(service).reduce((sum: any, funcName: string) => {
-          context.log(chalk.green(`- /${packageName}/${serviceName}.${funcName}(?)`))
+          this.context.log(chalk.green(`- /${packageName}/${serviceName}.${funcName}(?)`))
           sum[funcName] = async (ctx) => {
             let data = service[funcName]
             if (typeof data === 'function') {
-              data = await data(ctx)
+              data = await data(ctx, self)
             }
             // @ts-ignore
             const metadata = ctx.metadata
-            const rs = replaceVars(data, { metadata, $: self })
+            const request = ctx.request
+            const rs = replaceVars(data, { $metadata: metadata, $meta: metadata, $: self, $request: request, $req: request })
             ctx.call.sendUnaryMessage(null, rs)
           }
           return sum
         }, {}))
       }
-      context.groupEnd()
+      this.context.groupEnd()
     }
   }
 
   async exec() {
     if (!this.slient && this.title) this.context.group(chalk.green('%s'), this.title)
     try {
-      context.log(chalk.green('gRPC is listening at %s:%d'), this.host, this.port)
+      this.context.log(chalk.green('gRPC is listening at %s:%d'), this.host, this.port)
       this._server.bindAsync(`${this.host}:${this.port}`, ServerCredentials.createInsecure(), () => {
         this._server.start();
       })
 
       return new Promise(async (resolve) => {
         // Listen to force stop
-        context.once('app:stop', async () => {
+        this.context.once('app:stop', async () => {
           this._server.forceShutdown()
           resolve(undefined)
         })

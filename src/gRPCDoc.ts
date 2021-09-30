@@ -72,7 +72,7 @@ export class gRPCDoc extends OutputFile {
     }
 
     const details = ['', '<br/><br/>', '']
-    const apis = uniqBy(gRPC.APIs.filter(api => api.docs && api.title), tag => `\`/${tag.package}/${tag.service}.${tag.function}(?)\``)
+    const apis = uniqBy(gRPC.APIs.filter(api => api.docs && api.title), tag => `\`/${tag.package}/${tag.service}.${tag.method}(?)\``)
     const tags = [] as { name: string, items: gRPC[] }[]
     apis.forEach(a => {
       a.docs = merge({ md: { tags: [] }, tags: [] }, a.docs)
@@ -121,7 +121,7 @@ export class gRPCDoc extends OutputFile {
 
         len++
         const tagTitle = tag.docs.deprecated ? `~~${tag.title}~~` : `${tag.title}`
-        menus.push(`|${i + 1}.| [${tagTitle}](#${tag.index}) | ${`\`/${tag.package}/${tag.service}.${tag.function}(?)\``} | [YAML](${relative(saveFolder, yamlFile)}) |`)
+        menus.push(`|${i + 1}.| [${tagTitle}](#${tag.index}) | ${`\`/${tag.package}/${tag.service}.${tag.method}(?)\``} | [YAML](${relative(saveFolder, yamlFile)}) |`)
       })
       menus.splice(idx, 0, `| <a name='ANCHOR_-1'></a> | __${tag.name}__ - _${len} items_ |`)
     }
@@ -143,7 +143,7 @@ export class gRPCDoc extends OutputFile {
 
       details.push(`Package &nbsp;&nbsp;&nbsp; __\`${tag.package}\`__  `)
       details.push(`Service &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; __\`${tag.service}\`__  `)
-      details.push(`Function &nbsp;&nbsp;&nbsp; __\`${tag.function}\`__  `)
+      details.push(`Method &nbsp;&nbsp;&nbsp; __\`${tag.method}\`__  `)
 
       const pt = /^import ["']([^'"]+)/mg
       const cnt = readFileSync(tag.proto).toString()
@@ -182,43 +182,43 @@ export class gRPCDoc extends OutputFile {
         details.push(`</details>`, '')
 
         details.push('```yaml')
-        details.push(schemaToMD(merge({}, toJsonSchema(metadata), tag.docs.metadata)))
+        details.push(schemaToMD({}, merge({}, toJsonSchema(metadata), tag.docs.metadata)))
         details.push('```', '')
       }
 
-      // Input
-      if (tag.input) {
-        if (isGotData(tag.input, false)) {
-          details.push(`<details><summary>Input</summary>`, '')
-          if (typeof tag.input === 'object') {
-            details.push('```json', JSON.stringify(tag.input, null, '  '), '```', '')
+      // Request
+      if (tag.request) {
+        if (isGotData(tag.request, false)) {
+          details.push(`<details><summary>Request</summary>`, '')
+          if (typeof tag.request === 'object') {
+            details.push('```json', JSON.stringify(tag.request, null, '  '), '```', '')
           } else {
-            details.push('```text', tag.input, '```')
+            details.push('```text', tag.request, '```')
           }
           details.push(`</details>`, '')
 
           details.push('```yaml')
-          details.push(schemaToMD(merge({}, toJsonSchema(tag.input), tag.docs.input)))
+          details.push(schemaToMD({}, merge({}, toJsonSchema(tag.request), tag.docs.request)))
           details.push('```', '')
         }
       }
 
-      if (tag.output) {
+      if (tag.response) {
         details.push('', '<br/>', '', '### Response', '')
 
-        // Output
-        if (isGotData(tag.output?.data, false)) {
-          details.push(`<details><summary>Output</summary>`, '')
-          if (typeof tag.output.data === 'object') {
-            details.push('```json', JSON.stringify(tag.output.data, null, '  '), '```', '')
+        // Response
+        if (isGotData(tag.response?.data, false)) {
+          details.push(`<details><summary>Response</summary>`, '')
+          if (typeof tag.response.data === 'object') {
+            details.push('```json', JSON.stringify(tag.response.data, null, '  '), '```', '')
           } else {
-            details.push('```text', tag.output.data, '```', '')
+            details.push('```text', tag.response.data, '```', '')
           }
           details.push(`</details>  `, '')
 
-          if (typeof tag.output.data === 'object') {
+          if (typeof tag.response.data === 'object') {
             details.push('```yaml')
-            details.push(schemaToMD(merge({}, toJsonSchema(tag.output.data), tag.docs.output)))
+            details.push(schemaToMD({}, merge({}, toJsonSchema(tag.response.data), tag.docs.response)))
             details.push('```', '')
           }
         }
